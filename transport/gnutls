@@ -74,8 +74,6 @@ function gnutls.disconnect () {
 #   Read from IRC server.
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function gnutls.read () {
-# is gnutls running?
-  kill -0 $GNUTLS_PID &>/dev/null || return 2
   read -r -t $DEFAULT_TIMEOUT -u $GNUTLS_FD_IN TRANSPORT_READ
   return $?
 }

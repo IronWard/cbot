@@ -68,8 +68,6 @@ function netcat.disconnect () {
 #   Read from IRC server.
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function netcat.read () {
-# is netcat running?
-  kill -0 $NETCAT_PID &>/dev/null || return 2
   read -r -t $DEFAULT_TIMEOUT -u $NETCAT_FD_IN TRANSPORT_READ
   return $?
 }

@@ -74,8 +74,6 @@ function openssl.disconnect () {
 #   Read from IRC server.
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function openssl.read () {
-# is openssl running?
-  kill -0 $OPENSSL_PID &>/dev/null || return 2
   read -r -t $DEFAULT_TIMEOUT -u $OPENSSL_FD_IN TRANSPORT_READ
   return $?
 }

@@ -25,7 +25,7 @@ function signal.handle_hungup () {
 
 #----------------------------------------------------------------------#
 # Description:
-#   Commands to run on SIGINT
+#   Commands to run on SIGINT, SIGTERM
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function signal.handle_interrupt () {
   cbot.cleanup
@@ -33,6 +33,6 @@ function signal.handle_interrupt () {
 }
 
 
-trap signal.handle_interrupt SIGINT
+trap signal.handle_interrupt SIGINT SIGTERM
 trap signal.handle_hungup SIGHUP
 trap signal.handle_child SIGCHLD

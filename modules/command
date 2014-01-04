@@ -65,7 +65,9 @@ function command.parse_pmsg () {
       [[ $TXT == '' ]] || transport.write "PART $TXT"
       ;;
     (quit)
-      transport.write "QUIT :$TXT"
+#     Do NOT use 'QUIT' if you are using OpenSSL as transport module.
+#     OpenSSL will disconnect if a 'QUIT' is read from stdin.
+      transport.write "quit :$TXT"
       ;;
     (quote)
       [[ $TXT == '' ]] || transport.write "$TXT"

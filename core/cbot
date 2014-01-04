@@ -3,7 +3,7 @@
 # Module category : core
 # Description     : cbot core functions. loads in all other modules.
 
-CBOT_RECONNECT=0
+CBOT_RECONNECT=1
 CBOT_RETRYCOUNT=0
 
 #----------------------------------------------------------------------#
@@ -64,7 +64,6 @@ function cbot.run () {
   while [[ $CBOT_RECONNECT -gt 0 ]]
   do
 
-    CBOT_RECONNECT=0
     let CBOT_RETRYCOUNT++
     let "SEC=$CBOT_RETRYCOUNT * $DEFAULT_RETRYINC"
     log.write "Retry $CBOT_RETRYCOUNT after $SEC seconds"

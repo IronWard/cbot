@@ -65,6 +65,7 @@ function transport.encoding () {
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function transport.read () {
   local RE
+  TRANSPORT_READ=''
   ${TRANSPORT_MODULE}.read || return $?
   transport.decoding
 # read removes trailing \n but not \r
