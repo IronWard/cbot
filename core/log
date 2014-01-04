@@ -1,0 +1,69 @@
+# cbot
+# Module name     : log
+# Module category : core
+# Depends         : cbot
+# Description     : write logs to file
+
+LOG_LEVEL=0
+LOG_FD=-1
+LOG_DATE=''
+
+#----------------------------------------------------------------------#
+# Description:
+#   close log file
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function log.close () {
+  exec {LOG_FD}>&-
+  LOG_FD=-1
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   open log file
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function log.open () {
+  local FILE
+  LOG_DATE=$(date +%Y%m%d)
+  FILE=$BOTDIR/logs/$LOG_DATE.log
+
+  [[ -d $BOTDIR/logs ]] || mkdir $BOTDIR/logs
+
+  if [[ -f $FILE ]]
+  then
+    exec {LOG_FD}>>$FILE
+  else
+    exec {LOG_FD}>$FILE
+  fi
+
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   write logs to file
+# Usage:
+#   log.write <text>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function log.write () {
+  local DATE
+
+  [[ $LOG_FD -eq -1 ]] && return 0
+
+# check whether to open a new log file
+  DATE=$(date +%Y%m%d)
+  [[ $DATE == $LOG_DATE ]] || {
+    log.close
+    log.open
+  }
+
+# timestamp the text before logging
+  echo $(date '+{%T}')" $*" >&$LOG_FD
+  return $?
+}
+
+
+log.open
+[[ $? -ne 0 ]] && cbot.die "failed to open log file"

@@ -1,0 +1,281 @@
+# cbot
+# Module name     : loader
+# Module category : core
+# Depends         : log
+# Description     : Load/unload event handler modules.
+#                   See doc/module.txt for a guide on writing modules
+#                   that can be used with the loader
+
+
+# associative array: LOADER_MODULELIST[<module path>]=<install string>
+# <module path> is the absolute path of the module;
+# a module install string is of format 
+# "<event1> <function1> <event2> <function2> ..."
+declare -A LOADER_MODULELIST
+
+# associative array:
+# LOADER_EVENTLIST[<event>]="<function1> <function2> ..."
+# here is a list of events and their handlers.
+# <event> can be any IRC command, numeric replies, or any events
+# generated during the 'process' phase of irc.event function in 
+# core/irc module.
+declare -A LOADER_EVENTLIST
+
+# module install string that should be filled by <module>.install() call
+LOADER_INSTALLSTRING=""
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Add one event handler to the handler list.
+# Usage:
+#   loader.add_handler event functionname
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.add_handler () {
+  local E F
+  E=$1
+  F=$2
+  [[ $E == "" || $F == "" ]] && return 1
+  cbot.debug 3 "loader:add_handler: $E $F"
+  LOADER_EVENTLIST[$E]="${LOADER_EVENTLIST[$E]} $F"
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Check whether the file should be ignored as a module file in 
+#   modules/ directory.
+# Usage:
+#   loader.checkfilename <file>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.checkfilename () {
+  local FILE SUFFIX RC
+  FILE=$1
+  RC=0
+  for SUFFIX in $DEFAULT_IGNORESUFFIX
+  do
+    [[ $FILE == ${FILE%%$SUFFIX} ]] || {
+      RC=1
+      break
+    }
+  done
+  return $RC
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   List all event handlers
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.listhandler () {
+  local EVENT
+  cbot.debug 0 "Listing all event handlers:"
+  for EVENT in "${!LOADER_EVENTLIST[@]}"
+  do
+    cbot.debug 0 "Event name: $EVENT"
+    cbot.debug 0 "Handlers  : ${LOADER_EVENTLIST[$EVENT]}"
+  done
+  cbot.debug 0 "End of handler list."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   List loaded modules.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.listmodule () {
+  local MODULE
+  cbot.debug 0 "Listing all loaded modules:"
+  for MODULE in "${!LOADER_MODULELIST[@]}"
+  do
+    cbot.debug 0 "Module name: $MODULE"
+    cbot.debug 0 "Install string: ${LOADER_MODULELIST[$MODULE]}"
+  done
+  cbot.debug 0 "End of module list."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Load one module dynamically. It sources in your module file and
+#   call loader.load2 to register the module.
+# Usage:
+#   loader.load <module path>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.load () {
+  local MODULE
+# get full path of the module file
+  MODULE=$(readlink -en $1)
+# return 1 if the file is not found
+  [[ $? -eq 0 ]] || {
+    cbot.debug 1 "loader.load: module $1 file not found"
+    return 1
+  }
+  [[ ${LOADER_MODULELIST[$MODULE]} == '' ]] || {
+    cbot.debug 1 "loader.load: module $MODULE already loaded."
+    return 1
+  }
+  log.write "Loading module $MODULE ..."
+  cbot.debug 1 "loader.load: loading module $MODULE ..."
+  source $MODULE
+  loader.load2 "$MODULE"
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Load one module. It assumes that the module file has been sourced
+#   in before calling this function. This function does below jobs:
+#     (1) call yourmodule.install
+#     (2) add your event handlers to a list
+#     (3) add your module to a list
+# Usage:
+#   loader.load2 <module path>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.load2 () {
+  local MODULE MODNAME I J N OPTION
+  local -a EA
+
+# get full path of the module file
+  MODULE=$(readlink -en $1)
+# return 1 if the file is not found
+  [[ $? -eq 0 ]] || {
+    cbot.debug 1 "loader.load2: module $MODULE file not found"
+    return 1
+  }
+
+# remove directory path from the full path; leave only the filename
+  MODNAME=${MODULE##*/}
+  LOADER_INSTALLSTRING=""
+# the install function should return a string in LOADER_INSTALLSTRING
+# variable whose format is
+# "<event1> <function1> <event2> <function2> ..."
+  ${MODNAME}.install
+  cbot.debug 2 "$MODNAME install string: $LOADER_INSTALLSTRING"
+
+  [[ $LOADER_INSTALLSTRING == "" ]] && return 0
+
+# load the install string into an array
+  EA=($LOADER_INSTALLSTRING)
+  N=${#EA[*]}
+# add one event handler a time
+  for (( I=0,J=1 ; $J < $N ; I+=2,J+=2 ))
+  do
+    loader.add_handler ${EA[$I]} ${EA[$J]}
+  done
+
+# add the module to the list
+  LOADER_MODULELIST[$MODULE]="$LOADER_INSTALLSTRING"
+
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Remove an event handler from the handler list
+# Usage:
+#   loader.remove_handler event functionname
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.remove_handler () {
+  local E F
+  E=$1
+  F=$2
+  [[ $E == "" || $F == "" ]] && return 1
+
+  cbot.debug 3 "loader:remove_handler: $E $F"
+
+# remove all occurrences of $F from the event list
+  LOADER_EVENTLIST[$E]=${LOADER_EVENTLIST[$E]//$F}
+
+# remove the function definition
+  unset -f $F
+
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Unload one module. Statically and dynamically loaded modules can be
+#   unloaded by this function.
+# Usage:
+#   loader.unload <module path>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.unload () {
+  local MODULE MODNAME STR I J N
+  local -a EA
+# get full path of the module file
+  MODULE=$(readlink -en $1)
+# return 1 if the file is not found
+  [[ $? -eq 0 ]] || {
+    cbot.debug 1 "loader.unload: module $MODULE file not found"
+    return 1
+  }
+
+# get the module install string
+  STR=${LOADER_MODULELIST[$MODULE]}
+  [[ $STR == "" ]] && {
+    return 1
+  }
+
+  cbot.debug 1 "unloading module $MODULE ..."
+
+# remove directory path from the full path; leave only the filename
+  MODNAME=${MODULE##*/}
+
+  $MODNAME.uninstall
+
+# load the install string into an array
+  EA=($STR)
+  N=${#EA[*]}
+
+# remove one event handler a time
+  for (( I=0,J=1 ; $J < $N ; I+=2,J+=2 ))
+  do
+    loader.remove_handler ${EA[$I]} ${EA[$J]}
+  done
+
+  unset -f $MODNAME.install $MODNAME.uninstall
+
+# remove the module from the list
+  unset LOADER_MODULELIST[$MODULE]
+
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Unload all loaded modules.
+# Usage:
+#   loader.unload_modules
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function loader.unload_modules () {
+  local MODULE
+  for MODULE in "${!LOADER_MODULELIST[@]}"
+  do
+    loader.unload "$MODULE"
+  done
+}
+
+
+# Load all event handler modules in the $MODDIR directory.
+cbot.debug 1 "Loading all modules in $MODDIR :"
+for LOADER_MODULE in $MODDIR/*
+do
+  loader.checkfilename $LOADER_MODULE
+  if [[ $? -eq 0 ]]
+  then
+    cbot.debug 1 "loading module $LOADER_MODULE ..."
+    log.write "Loading module $LOADER_MODULE ..."
+    source "$LOADER_MODULE"
+    loader.load2 "$LOADER_MODULE"
+  else
+    cbot.debug 1 "ignore module file $LOADER_MODULE"
+  fi
+done
+unset LOADER_MODULE
+

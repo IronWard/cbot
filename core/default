@@ -1,0 +1,22 @@
+# cbot
+# Module name     : default
+# Module category : core
+# Depends         : n/a
+# Description     : default variables
+
+DEFAULT_BOTNAME="cbot"
+DEFAULT_BOTVERSION="0.05"
+DEFAULT_BOTDESCRIPTION="A Bash Script IRC Bot"
+
+# files with below suffixes to be ignored
+DEFAULT_IGNORESUFFIX='~ .bk .bak README'
+
+# retry count multiplying this value is the number of
+# seconds to wait before next retry
+DEFAULT_RETRYINC=10
+
+# max consecutive retry after read timeout
+DEFAULT_RETRYMAX=10
+
+# timeout when read network (seconds)
+DEFAULT_TIMEOUT=180

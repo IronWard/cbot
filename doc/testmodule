@@ -1,0 +1,28 @@
+# cbot
+# Module name: testmodule
+# Module category: event handler
+# Description: a sample module
+
+
+# declare global variables that will be used in this module
+TESTMODULE_VAR1=
+# declare global arrays that will be used in this module
+TESTMODULE_ARRAY1=()
+# associative array will not work in a dynamic module!!!
+declare -A TESTMODULE_ASSOC
+
+
+function testmodule.install () {
+  LOADER_INSTALLSTRING="PRIVMSG testmodule.pmsg"
+}
+function testmodule.uninstall () {
+  unset TESTMODULE_VAR1 TESTMODULE_ARRAY1 TESTMODULE_ASSOC
+  unset -f testmodule.privfunc
+}
+function testmodule.pmsg () {
+#  echo "testmodule.pmsg called"
+  :
+}
+function testmodule.privfunc () {
+  :
+}

@@ -1,0 +1,35 @@
+# cbot
+# Module name: autojoin
+# Module category: event handler
+# Description: auto join channels on connect
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   put module install string. When '001' numeric is received,
+#   autojoin.join function should be called.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function autojoin.install () {
+  [[ $CHANNELS == "" ]] && return 0
+  LOADER_INSTALLSTRING="001 autojoin.join"
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   module clean up. Nothing to do for the moment.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function autojoin.uninstall () {
+  :
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   join $CHANNELS which is set in cbot.cfg
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function autojoin.join () {
+  [[ $CHANNELS == "" ]] || {
+    transport.write "JOIN $CHANNELS"
+  }
+}

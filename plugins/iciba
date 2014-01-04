@@ -1,0 +1,28 @@
+# cbot
+# Module name: iciba
+# Module category: plugin
+# Description: www.iciba.com interface
+
+
+function main () {
+  local T
+  [[ $1 == "" ]] && return 1
+  type wget &>/dev/null || return 1
+  type grep &>/dev/null || return 1
+  T=$(wget -O - -o /dev/null http://www.iciba.com/$1 | grep -E $'\t{15}<label>')
+  [[ $T == "" ]] && {
+    echo "$1 not found"
+    return 0
+  }
+  T=${T//$'\r'}
+  T=${T//$'\n'}
+  T=${T//$'\t'}
+  T=${T//'<label>'}
+  T=${T//'</label>'}
+  echo "$T"
+  return 0
+}
+
+main "$@"
+exit $?
+ 

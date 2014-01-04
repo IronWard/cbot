@@ -1,0 +1,29 @@
+# cbot
+# Module name: CTCP
+# Module category: event handler
+# Description: Provide CTCP reply
+
+
+function CTCP.install () {
+  LOADER_INSTALLSTRING="_VERSION CTCP.version"
+}
+
+
+function CTCP.uninstall () {
+  :
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   send bot version to the querying party.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function CTCP.version () {
+  local CTCP_REPLY T1 T2 T3
+
+  T1=$'\001'
+  T2="VERSION $DEFAULT_BOTNAME v$DEFAULT_BOTVERSION"
+  CTCP_REPLY="$T1$T2$T1"
+  transport.write "NOTICE $IRC_NICK :$CTCP_REPLY"
+}
+

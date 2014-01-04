@@ -1,0 +1,219 @@
+# cbot
+# Module name     : ircv3
+# Module category : core
+# Depends         : n/a
+# Description     : ircv3 related functions.
+#                   For details about IRCv3, see http://ircv3.org
+
+
+# This variable will be set to 1 if cbot.cfg has configurations that 
+# require IRCv3 functions
+IRCV3=0
+
+# IRCV3_CAP_STATE : status of the CAP negotiation
+#   0  : not in negotiation
+#   1  : LS sent, waiting for LS response
+#   2  : REQ sent, waiting for ACK response
+#   3  : waiting for other response
+#   99 : negotiation completed
+IRCV3_CAP_STATE=0
+
+# IRCV3_SASL : SASL support
+#   0 : SASL negotiation has not started
+#   1 : REQ SASL sent, waiting for ACK SASL response
+#   2 : AUTHENTICATE <mechanism> sent, waiting for AUTHENTICATE response
+#   3 : AUTHENTICATE <credential> sent, waiting for numeric reply
+#   4 : SASL authentication succeeded
+#   5 : SASL authentication failed
+IRCV3_SASL=0
+IRCV3_AUTH=""
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   End of a CAP negotiation.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.cap_end () {
+  transport.write "CAP END"
+  IRCV3_CAP_STATE=99
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse IRCv3 related commands.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.parse () {
+  [[ $IRCV3 -eq 0 ]] && return 0
+  case $IRC_COMMAND in
+    (CAP) ircv3.parse_cap ;;
+    (AUTHENTICATE) ircv3.parse_authenticate ;;
+    (900|904|905) ircv3.parse_numeric ;;
+  esac
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse a AUTHENTICATE response from server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.parse_authenticate () {
+  [[ $IRCV3_SASL -eq 2 && $IRC_TARGET == '+' ]] && {
+#   send the SASL credential to server
+    transport.write "AUTHENTICATE $IRCV3_AUTH"
+    IRCV3_SASL=3
+  }
+  return 0 ;
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse a CAP response from server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.parse_cap () {
+  local TARGET COMMAND
+
+  read -r TARGET COMMAND <<<$IRC_TARGET
+  case $COMMAND in
+    (LS)
+      ircv3.parse_cap_ls
+      ;;
+    (ACK)
+      ircv3.parse_cap_ack
+      ;;
+  esac
+
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse a CAP ACK response from server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.parse_cap_ack () {
+  local EXTENSION
+  if [[ $IRCV3_CAP_STATE -eq 2 ]]
+  then
+    for EXTENSION in $IRC_TRAIL
+      do
+        case $EXTENSION in
+          (sasl)
+            [[ $IRCV3_SASL -eq 1 ]] && {
+              IRCV3_CAP_STATE=3
+              IRCV3_SASL=2
+#             send auth mechanism
+              transport.write "AUTHENTICATE PLAIN"
+            }
+            ;;
+        esac
+      done
+#   If after parsing the extensions I haven't moved to next state,
+#   I should end the CAP negotiation.
+    [[ $IRCV3_CAP_STATE -eq 2 ]] && ircv3.cap_end
+  else
+    ircv3.cap_end
+  fi
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse a CAP LS response from server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.parse_cap_ls () {
+  local EXTENSION
+  if [[ $IRCV3_CAP_STATE -eq 1 ]]
+  then
+    for EXTENSION in $IRC_TRAIL
+      do
+        case $EXTENSION in
+          (sasl)
+            [[ $IRCV3_SASL -eq 0 ]] && {
+              transport.write "CAP REQ :sasl"
+              IRCV3_SASL=1
+              IRCV3_CAP_STATE=2
+            }
+            ;;
+#         more cases will be added here when I support them.
+#         (multi-prefix) ;;
+        esac
+      done
+#   If after parsing the extensions I haven't moved to next state,
+#   I should end the CAP negotiation.
+    [[ $IRCV3_CAP_STATE -eq 1 ]] && ircv3.cap_end
+  else
+    ircv3.cap_end
+  fi
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse a numeric reply 900, 904 or 905 from server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.parse_numeric () {
+  case $IRC_COMMAND in
+    (900)
+      [[ $IRCV3_SASL -eq 3 ]] && IRCV3_SASL=4
+      ;;
+    (904|905)
+      [[ $IRCV3_SASL -eq 3 ]] && IRCV3_SASL=5
+      ;;
+  esac
+  ircv3.cap_end
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   SASL authentication initialization.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.sasl_init () {
+
+  [[ $SASL_ID == '' || $SASL_PASS == '' ]] && return 0
+
+  type tr &>/dev/null
+  [[ $? -eq 0 ]] || cbot.die "tr: command not found."
+  type base64 &>/dev/null
+  [[ $? -eq 0 ]] || cbot.die "base64: command not found."
+
+# base64 encoded PLAIN SASL authentication
+  IRCV3_AUTH=$( echo -n $'\n'"$SASL_ID"$'\n'"$SASL_PASS" | \
+                tr '\n' '\000' | \
+                base64 \
+              )
+  cbot.debug 9 "SASL PLAIN AUTH: $IRCV3_AUTH"
+
+  IRCV3=1
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Start a CAP LS command. This function is called in irc.run to begin
+#   client capability negotiation.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.start () {
+  [[ IRCV3 -eq 0 ]] && return 0
+  transport.write "CAP LS"
+  IRCV3_CAP_STATE=1
+  return 0
+}
+
+#----------------------------------------------------------------------#
+# Description:
+#   Reset IRCv3 state to initial status
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function ircv3.stop () {
+
+  IRCV3_SASL=0
+  IRCV3_CAP_STATE=0
+
+}
+
+ircv3.sasl_init

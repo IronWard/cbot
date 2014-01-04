@@ -1,0 +1,108 @@
+# cbot
+# Module name     : transport
+# Module category : core
+# Depends         : cbot
+# Description     : I/O layer over TCP/IP
+#                   this module defines high level TCP interfaces used
+#                   by other bot modules. the actual I/O relies on an
+#                   underlying module in the transport/ directory.
+
+
+# the underlying module should put the read content in this variable
+TRANSPORT_READ=''
+TRANSPORT_WRITE=''
+
+#----------------------------------------------------------------------#
+# Description:
+#   call underlying module to do TCP initialization.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function transport.connect () {
+  ${TRANSPORT_MODULE}.connect
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   translate $TRANSPORT_READ from server encoding to client encoding.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function transport.decoding () {
+  [[ $SERVERENCODING == $CLIENTENCODING ]] && return 0
+  TRANSPORT_READ=$(iconv -f $SERVERENCODING -t $CLIENTENCODING \
+                    <<<"$TRANSPORT_READ")
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   call underlying module to do TCP cleanup.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function transport.disconnect () {
+  ${TRANSPORT_MODULE}.disconnect
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   translate $TRANSPORT_WRITE from client encoding to server encoding.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function transport.encoding () {
+  [[ $SERVERENCODING == $CLIENTENCODING ]] && return 0
+  TRANSPORT_WRITE=$(iconv -f $CLIENTENCODING -t $SERVERENCODING \
+                    <<<"$TRANSPORT_WRITE")
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   this function does below steps:
+#     (1) call underlying module to read one line from IRC server;
+#     (2) translate from server encoding to client encoding;
+#     (3) remove the trailing \r. \n has been removed by 'read' in the
+#         underlying module;
+#     (4) log the line read from IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function transport.read () {
+  local RE
+  ${TRANSPORT_MODULE}.read || return $?
+  transport.decoding
+# read removes trailing \n but not \r
+  RE=$'^(.*)\r$'
+  [[ $TRANSPORT_READ =~ $RE ]] && {
+    TRANSPORT_READ=${BASH_REMATCH[1]}
+  }
+  [[ $LOG_IRC_IO -eq 0 ]] || log.write "-> $TRANSPORT_READ"
+  return 0
+}
+
+#----------------------------------------------------------------------#
+# Description:
+#   this function does below steps:
+#     (1) append \r\n to the line;
+#     (2) translate from client encoding to server encoding;
+#     (3) call underlying module to write the line to IRC server;
+#     (4) log the line written to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function transport.write () {
+# append \r\n to the line
+  TRANSPORT_WRITE="$*"$'\r\n'
+# translate from client encoding to server encoding
+  transport.encoding
+  ${TRANSPORT_MODULE}.write "$TRANSPORT_WRITE" || return $?
+  [[ $LOG_IRC_IO -eq 0 ]] || log.write "<- $*"
+  return $?
+}
+
+
+[[ $SERVERENCODING == $CLIENTENCODING ]] || {
+# check iconv
+  type iconv &>/dev/null
+  [[ $? -eq 0 ]] || cbot.die "iconv: command not found."
+}
+
+# netcat is the default transport module
+[[ $TRANSPORT_MODULE == "" ]] && TRANSPORT_MODULE='netcat'
+
+cbot.debug 1 "loading transport module $TRANSPORT_MODULE ..."
+source $TRANDIR/$TRANSPORT_MODULE

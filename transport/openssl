@@ -1,0 +1,93 @@
+# cbot
+# module name: openssl
+# module category: transport
+# description: transport module that supports SSL
+
+OPENSSL_IN=
+OPENSSL_OUT=
+OPENSSL_FD_IN=-1
+OPENSSL_FD_OUT=-1
+OPENSSL_PID=0
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Connect to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function openssl.connect () {
+  local OPT
+
+  [[ $OPENSSL_PID -eq 0 ]] || return 1
+
+  type openssl &>/dev/null || \
+    cbot.die "openssl not found. Have you installed openssl?"
+
+# make command line options for client certificate
+  if [[ $TLS_CERT == '' ]]
+  then
+    OPT=''
+  else
+    OPT="-cert $TLS_CERT -key $TLS_KEY"
+  fi
+
+  OPENSSL_IN=$BOTDIR/in.$RANDOM
+  OPENSSL_OUT=$BOTDIR/out.$RANDOM
+  mkfifo $OPENSSL_IN
+  mkfifo $OPENSSL_OUT
+  openssl s_client -quiet -connect ${SERVER}:$PORT $OPT \
+    <$OPENSSL_IN >$OPENSSL_OUT 2>/dev/null &
+  OPENSSL_PID=$!
+
+# $OPENSSL_IN is where we write to IRC server
+# $OPENSSL_OUT is where we read from IRC server
+  exec {OPENSSL_FD_OUT}>$OPENSSL_IN
+  exec {OPENSSL_FD_IN}<$OPENSSL_OUT
+
+# wait some time for openssl to connect
+  sleep 3
+  kill -0 $OPENSSL_PID &>/dev/null
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Disconnect to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function openssl.disconnect () {
+
+  [[ $OPENSSL_PID -eq 0 ]] && return 1
+
+  kill -9 $OPENSSL_PID &>/dev/null
+  exec {OPENSSL_FD_IN}<&-
+  exec {OPENSSL_FD_OUT}>&-
+  rm -f $OPENSSL_IN $OPENSSL_OUT
+  OPENSSL_PID=0
+  OPENSSL_FD_IN=-1
+  OPENSSL_FD_OUT=-1
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Read from IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function openssl.read () {
+# is openssl running?
+  kill -0 $OPENSSL_PID &>/dev/null || return 2
+  read -r -t $DEFAULT_TIMEOUT -u $OPENSSL_FD_IN TRANSPORT_READ
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Write to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function openssl.write () {
+# is openssl running?
+  kill -0 $OPENSSL_PID &>/dev/null || return 2
+  echo -n "$*" >&$OPENSSL_FD_OUT
+  return $?
+}

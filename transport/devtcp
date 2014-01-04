@@ -1,0 +1,59 @@
+# cbot
+# module name: devtcp
+# module category: transport
+# description: devtcp transport module
+
+DEVTCP_ADDRESS=""
+DEVTCP_FD=-1
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Connect to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function devtcp.connect () {
+
+  [[ $DEVTCP_ADDRESS == "" ]] || return 1
+
+  DEVTCP_ADDRESS=$SERVER:$PORT
+  exec {DEVTCP_FD}<>/dev/tcp/$SERVER/$PORT
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Disconnect to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function devtcp.disconnect () {
+
+  [[ $DEVTCP_ADDRESS == "" ]] && return 1
+
+  DEVTCP_ADDRESS=""
+  exec {DEVTCP_FD}<&-
+  exec {DEVTCP_FD}>&-
+  DEVTCP_FD=-1
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Read from IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function devtcp.read () {
+
+  read -r -t $DEFAULT_TIMEOUT -u $DEVTCP_FD TRANSPORT_READ
+  return $?
+
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Write to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function devtcp.write () {
+  echo -n "$*" >&$DEVTCP_FD
+  return $?
+}

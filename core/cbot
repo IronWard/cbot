@@ -1,0 +1,107 @@
+# cbot
+# Module name     : cbot
+# Module category : core
+# Description     : cbot core functions. loads in all other modules.
+
+CBOT_RECONNECT=0
+CBOT_RETRYCOUNT=0
+
+#----------------------------------------------------------------------#
+# Description:
+#   Do cleanup works that would not be done in other modules
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function cbot.cleanup () {
+  transport.disconnect
+  loader.unload_modules
+  log.close
+}
+
+#----------------------------------------------------------------------#
+# Description:
+#   Output debug information
+# Usage:
+#   cbot.debug <n> <text>
+#   where:
+#     <n>    : debug level; must be a number. if this number is less
+#              than or equal to $CBOT_DEBUG , the text will be output.
+#     <text> : the output message.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function cbot.debug () {
+  local LEVEL
+  LEVEL=$1
+# remove <n> from the parameter list
+  shift
+  [[ $LEVEL -gt $CBOT_DEBUG ]] || echo "$*"
+}
+
+#----------------------------------------------------------------------#
+# Description:
+#   Exit immediately with an error message; no more cleanup.
+# Usage:
+#   cbot.die <message>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function cbot.die () {
+  local LINE FILE
+  read -r LINE FILE <<<$(caller)
+  echo "died at line $LINE in file $FILE : $*"
+  log.write "died at line $LINE in file $FILE : $*"
+  exit 16
+}
+
+#----------------------------------------------------------------------#
+# Description:
+#   Run the bot
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function cbot.run () {
+  local SEC
+
+  log.write "Connecting to $SERVER port $PORT ..."
+  transport.connect
+  [[ $? -eq 0 ]] || cbot.die "connect failed"
+  irc.run
+  transport.disconnect
+
+  while [[ $CBOT_RECONNECT -gt 0 ]]
+  do
+
+    CBOT_RECONNECT=0
+    let CBOT_RETRYCOUNT++
+    let "SEC=$CBOT_RETRYCOUNT * $DEFAULT_RETRYINC"
+    log.write "Retry $CBOT_RETRYCOUNT after $SEC seconds"
+    sleep $SEC
+    log.write "Connecting to $SERVER port $PORT ..."
+    transport.connect
+    [[ $? -eq 0 ]] || cbot.die "connect failed"
+    irc.run
+    transport.disconnect
+    [[ $CBOT_RECONNECT -gt 0 && \
+       $CBOT_RETRYCOUNT -ge $DEFAULT_RETRYMAX ]] && {
+      log.write "Max retry reached. Exiting..."
+      break
+    }
+
+  done
+
+}
+
+#----------------------------------------------------------------------#
+# Description:
+#   Set up before run
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function cbot.setup () {
+  :
+}
+
+# bash options: ignore case
+shopt -s nocasematch
+
+# Load core modules. Sequence is important.
+source $COREDIR/default
+source $COREDIR/log
+source $COREDIR/config
+source $COREDIR/signal
+source $COREDIR/transport
+source $COREDIR/irc
+source $COREDIR/ircv3
+source $COREDIR/loader
+

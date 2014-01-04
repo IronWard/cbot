@@ -1,0 +1,271 @@
+# cbot
+# Module name     : irc
+# Module category : core
+# Depends         : n/a
+# Description     : irc related routines
+
+
+# IRC message format:
+# :<sender> <command> [param] [:trail]
+# 'sender' format if sender is a client:
+# <nick>!<user>@<host>
+IRC_SENDER=""
+IRC_COMMAND=""
+IRC_TARGET=""
+IRC_TRAIL=""
+IRC_NICK=""
+IRC_USER=""
+IRC_HOST=""
+
+# The event currently being dispatched
+IRC_EVENT=""
+IRC_EVENTSTRING=""
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Output IRC debug messages.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function irc.debug () {
+  cbot.debug 6 "-------------------------------------------------------"
+  cbot.debug 6 "Sender: $IRC_SENDER"
+  cbot.debug 6 "Command: $IRC_COMMAND"
+  cbot.debug 6 "Target: $IRC_TARGET"
+  cbot.debug 6 "Trail: $IRC_TRAIL"
+  cbot.debug 6 "-------------------------------------------------------" 
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Dispatch IRC events to handlers.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function irc.dispatch () {
+  local HANDLER
+
+  [[ $IRC_EVENT == '' ]] && return 0
+  for HANDLER in ${LOADER_EVENTLIST[$IRC_EVENT]}
+  do
+    cbot.debug 3 "dispatch event $IRC_EVENT to handler $HANDLER"
+    $HANDLER
+  done
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Generate events from one IRC message.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function irc.event () {
+
+  IRC_EVENT=''
+  IRC_EVENTSTRING=''
+
+# pre-process of the event
+# set event name to <command> prefixed with two underscores
+  IRC_EVENT='__'$IRC_COMMAND
+  irc.dispatch
+
+  IRC_EVENT=''
+  IRC_EVENTSTRING=''
+# process the event
+  case $IRC_COMMAND in
+    (ERROR)
+      CBOT_RECONNECT=0 ;;
+    (PING)
+      transport.write "PONG :$IRC_TRAIL" ;;
+    (PRIVMSG)
+      irc.parse_privmsg ;;
+    (NICK)
+      [[ $IRC_NICK == $BOTNICK ]] && BOTNICK=$IRC_TRAIL ;;
+    (CAP|AUTHENTICATE|900|904|905)
+      ircv3.parse ;;
+  esac
+# dispatch if a new event is generated
+  irc.dispatch
+
+# post-process of the event. set event name to <command>
+  IRC_EVENT=$IRC_COMMAND
+  IRC_EVENTSTRING=''
+  irc.dispatch
+
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse one IRC message.
+#   IRC message format:
+#   [ :<sender> ] <command> [ <param> [ <param>... ]] [ :<trail> ]
+#   so only the <command> is mandatory field.
+#   if <sender> is a client, it has below format:
+#     <nick>!<user>@<host>
+#   This function does below work:
+#     (1) split the message into IRC_SENDER IRC_COMMAND IRC_TARGET and
+#         IRC_TRAIL. IRC_TARGET is actually a wrap of <param> list.
+#     (2) if IRC_SENDER is a client, split it into IRC_NICK, IRC_USER
+#         and IRC_HOST.
+#     (3) generate IRC event.
+# Usage:
+#   irc.parse <message>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function irc.parse () {
+  local RE
+# pull out the <sender> from the IRC message.
+  read -r IRC_SENDER IRC_TRAIL <<<"$*"
+# test whether <sender> begins with ':'
+  if [[ ${IRC_SENDER:0:1} == ':' ]]
+  then
+# <sender> exists.
+#   remove leading colon ':'
+    IRC_SENDER=${IRC_SENDER:1}
+#   pull out <command>
+    read -r IRC_COMMAND IRC_TRAIL <<<"$IRC_TRAIL"
+  else
+# <sender> does not exist
+    IRC_COMMAND=$IRC_SENDER
+    IRC_SENDER=''
+  fi
+
+  if [[ ${IRC_TRAIL:0:1} == ':' ]]
+  then
+# if trail begins with ':' now, this command has no target
+    IRC_TARGET=''
+  else
+# split $IRC_TRAIL into IRC_TARGET and IRC_TRAIL
+#   the first occurrence of ' :' (space followed by a comma) marks the
+#   beginning of trail.
+    IRC_TARGET=${IRC_TRAIL%% :*}
+    if [[ $IRC_TARGET == $IRC_TRAIL ]]
+    then
+#     there is no ' :' in trail, this command has no trail.
+      IRC_TRAIL=''
+    else
+#     remove target and ' :' from trail
+      IRC_TRAIL=${IRC_TRAIL#* :}
+    fi
+#   remove trailing blanks from $IRC_TARGET
+    RE='^(.*[^ ]) +$'
+    [[ $IRC_TARGET =~ $RE ]] && IRC_TARGET=${BASH_REMATCH[1]}
+  fi
+
+  irc.debug
+
+# client mask format: <nick>!<user>@<host>
+  RE='^(.+)!(.+)@(.+)$' 
+  if [[ $IRC_SENDER =~ $RE ]]
+  then
+    IRC_NICK=${BASH_REMATCH[1]}
+    IRC_USER=${BASH_REMATCH[2]}
+    IRC_HOST=${BASH_REMATCH[3]}
+  else
+    IRC_NICK=""
+    IRC_USER=""
+    IRC_HOST=""
+  fi
+
+# generate events
+  irc.event
+
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Parse the PRIVMSG message.
+#   PRIVMSG message format:
+#   :<nick>!<user>@<host> PRIVMSG <targets> :<text>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function irc.parse_privmsg () {
+  local RE C1 TEXT
+
+# is the target a channel or a client?
+  C1=${IRC_TARGET:0:1}
+
+# check for $'\001' quoted text
+# this should be checked via regular expression $'\001(.+)\001'
+# but bash's RE is buggy; it swallows the $'\001' in the RE!
+  RE='^(.)(.+)\1$'
+
+  [[ $IRC_TRAIL =~ $RE && ${BASH_REMATCH[1]} == $'\001' ]] && {
+    TEXT=${BASH_REMATCH[2]}
+    RE='ACTION (.*)'
+#   is this an action ? (mIRC /me command)
+    if [[ $TEXT =~ $RE ]]
+    then
+# TODO: channel prefix should be retrieved from numeric 005
+      if [[ $C1 == '#' || $C1 == '&' ]]
+      then
+        IRC_EVENT='_CACTION'
+      else
+        IRC_EVENT='_PACTION'
+      fi
+      IRC_EVENTSTRING=${BASH_REMATCH[1]}
+    else
+#     check for CTCP event
+      IRC_EVENTSTRING=''
+      case $TEXT in
+        (VERSION)
+           IRC_EVENT='_VERSION' ;;
+        (PING)
+           IRC_EVENT='_PING' ;;
+        (TIME)
+           IRC_EVENT='_TIME' ;;
+        (FINGER)
+           IRC_EVENT='_FINGER' ;;
+        (*)
+           IRC_EVENT='_CTCP'
+           IRC_EVENTSTRING=$TEXT ;;
+      esac
+    fi
+# end of parsing quoted text. return
+    return 0
+  }
+
+# no special format in the text; parse normal message.
+# TODO: channel prefix should be from numeric 005
+  if [[ $C1 == '#' || $C1 == '&' ]]
+  then
+    IRC_EVENT='_CMSG'
+  else
+    IRC_EVENT='_PMSG'
+  fi
+  IRC_EVENTSTRING=$IRC_TRAIL
+
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   IRC client loop
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function irc.run () {
+  local RC
+
+  ircv3.start
+
+# HOSTNAME is a bash variable
+  transport.write "USER $BOTUSER $HOSTNAME $SERVER :$BOTREAL"
+  transport.write "NICK $BOTNICK"
+  transport.read
+  RC=$?
+
+# if first read succeeds, reset retry count
+  [[ $RC -eq 0 ]] && CBOT_RETRYCOUNT=0
+  while [[ $RC -eq 0 ]]
+  do
+    irc.parse "$TRANSPORT_READ"
+    transport.read
+    RC=$?
+  done
+
+  ircv3.stop
+
+  [[ $RC -gt 128 ]] && {
+    log.write "Timeout... reconnecting..."
+    CBOT_RECONNECT=1
+  }
+
+}
+
+

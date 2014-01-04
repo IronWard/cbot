@@ -1,0 +1,51 @@
+# cbot
+# Module name     : config
+# Module category : core
+# Depends         : cbot
+# Description     : cbot configuration commands
+
+# load the configuration file
+# $CONFIG is set in cbot.sh
+cbot.debug 1 "loading config file $CONFIG ..."
+source $CONFIG
+
+# SERVER must exist in config file
+[[ $SERVER == "" ]] && cbot.die "server address not defined."
+
+# default port of IRC is 6667
+[[ $PORT == "" ]] && PORT=6667
+
+[[ $BOTNICK == "" ]] && BOTNICK=$DEFAULT_BOTNAME$RANDOM
+[[ $BOTUSER == "" ]] && BOTUSER=$(whoami)
+[[ $BOTREAL == "" ]] && BOTREAL=$DEFAULT_BOTDESCRIPTION
+
+# debug level
+[[ $CBOT_DEBUG == "" ]] && CBOT_DEBUG=0
+
+# set locale
+[[ $SERVERENCODING == "" || $SERVERENCODING == "utf8" ]] && \
+  SERVERENCODING="UTF-8"
+
+# if client side character set is not set,
+# use the character set specified in $LANG variable.
+[[ $CLIENTENCODING == "" ]] && CLIENTENCODING=${LANG/*.}
+[[ $CLIENTENCODING == "utf8" ]] && CLIENTENCODING="UTF-8"
+
+if [[ $LOG_IRC_IO == '' || $LOG_IRC_IO == 'false' || \
+     $LOG_IRC_IO == 'n' || $LOG_IRC_IO == 'no' || $LOG_IRC_IO -eq 0 ]]
+then
+  LOG_IRC_IO=0
+else
+  LOG_IRC_IO=1
+fi
+
+# check TLS_CERT and TLS_KEY 
+if [[ $TLS_CERT == '' || $TLS_KEY == '' || ! -r "$BOTDIR/$TLS_CERT" \
+      || ! -r "$BOTDIR/$TLS_KEY" ]]
+then
+  TLS_CERT=''
+  TLS_KEY=''
+else
+  TLS_CERT="$BOTDIR/$TLS_CERT"
+  TLS_KEY="$BOTDIR/$TLS_KEY"
+fi

@@ -1,0 +1,38 @@
+# cbot
+# Module name     : signal
+# Module category : core
+# Depends         : n/a
+# Description     : handlers of system signals
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Commands to run on SIGCHLD
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function signal.handle_child () {
+  cbot.debug 0 "SIGCHLD received."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Commands to run on SIGHUP
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function signal.handle_hungup () {
+  :
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Commands to run on SIGINT
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function signal.handle_interrupt () {
+  cbot.cleanup
+  exit 8
+}
+
+
+trap signal.handle_interrupt SIGINT
+trap signal.handle_hungup SIGHUP
+trap signal.handle_child SIGCHLD

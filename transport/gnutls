@@ -1,0 +1,94 @@
+# cbot
+# module name: gnutls
+# module category: transport
+# description: transport module that supports SSL
+
+GNUTLS_IN=
+GNUTLS_OUT=
+GNUTLS_FD_IN=-1
+GNUTLS_FD_OUT=-1
+GNUTLS_PID=0
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Connect to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function gnutls.connect () {
+  local OPT
+
+  [[ $GNUTLS_PID -eq 0 ]] || return 1
+
+  type gnutls-cli &>/dev/null || \
+    cbot.die "gnutls-cli not found. Have you installed gnutls?"
+
+# make command line options for client certificate
+  if [[ $TLS_CERT == '' ]]
+  then
+    OPT=''
+  else
+    OPT="--x509keyfile=$TLS_KEY --x509certfile=$TLS_CERT"
+  fi
+
+  GNUTLS_IN=$BOTDIR/in.$RANDOM
+  GNUTLS_OUT=$BOTDIR/out.$RANDOM
+  mkfifo $GNUTLS_IN
+  mkfifo $GNUTLS_OUT
+  gnutls-cli -p $PORT --insecure $OPT $SERVER \
+    <$GNUTLS_IN >$GNUTLS_OUT 2>/dev/null &
+  GNUTLS_PID=$!
+
+# $GNUTLS_IN is where we write to IRC server
+# $GNUTLS_OUT is where we read from IRC server
+  exec {GNUTLS_FD_OUT}>$GNUTLS_IN
+  exec {GNUTLS_FD_IN}<$GNUTLS_OUT
+
+# wait some time for gnutls to connect
+  sleep 3
+  kill -0 $GNUTLS_PID &>/dev/null
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Disconnect to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function gnutls.disconnect () {
+
+  [[ $GNUTLS_PID -eq 0 ]] && return 1
+
+  kill -9 $GNUTLS_PID &>/dev/null
+  exec {GNUTLS_FD_IN}<&-
+  exec {GNUTLS_FD_OUT}>&-
+  rm -f $GNUTLS_IN $GNUTLS_OUT
+  GNUTLS_PID=0
+  GNUTLS_FD_IN=-1
+  GNUTLS_FD_OUT=-1
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Read from IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function gnutls.read () {
+# is gnutls running?
+  kill -0 $GNUTLS_PID &>/dev/null || return 2
+  read -r -t $DEFAULT_TIMEOUT -u $GNUTLS_FD_IN TRANSPORT_READ
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Write to IRC server.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function gnutls.write () {
+# is gnutls running?
+  kill -0 $GNUTLS_PID &>/dev/null || return 2
+  echo -n "$*" >&$GNUTLS_FD_OUT
+  return $?
+}
+
