@@ -21,6 +21,11 @@ IRC_HOST=""
 IRC_EVENT=""
 IRC_EVENTSTRING=""
 
+# IRC connection status
+#   0 : not connected
+#   1 : connecting
+#   2 : connected
+IRC_STATE=0
 
 #----------------------------------------------------------------------#
 # Description:
@@ -80,6 +85,20 @@ function irc.event () {
       [[ $IRC_NICK == $BOTNICK ]] && BOTNICK=$IRC_TRAIL ;;
     (CAP|AUTHENTICATE|900|904|905)
       ircv3.parse ;;
+    (001)
+#     '001' welcome
+      CBOT_RETRYCOUNT=0
+      IRC_STATE=2
+      ;;
+    (432|433)
+#     '432' erroneous nick; '433' nick in use
+      [[ $IRC_STATE -eq 1 ]] && {
+#       if in the login process my nick is already used by someone,
+#       choose a random nick.
+        BOTNICK=${DEFAULT_BOTNAME:0:4}$RANDOM
+        transport.write "NICK $BOTNICK"
+      }
+      ;;
   esac
 # dispatch if a new event is generated
   irc.dispatch
@@ -244,14 +263,13 @@ function irc.run () {
 
   ircv3.start
 
+  IRC_STATE=1
 # HOSTNAME is a bash variable
   transport.write "USER $BOTUSER $HOSTNAME $SERVER :$BOTREAL"
   transport.write "NICK $BOTNICK"
   transport.read
   RC=$?
 
-# if first read succeeds, reset retry count
-  [[ $RC -eq 0 ]] && CBOT_RETRYCOUNT=0
   while [[ $RC -eq 0 ]]
   do
     irc.parse "$TRANSPORT_READ"
@@ -260,7 +278,7 @@ function irc.run () {
   done
 
   ircv3.stop
-
+  IRC_STATE=0
   [[ $RC -gt 128 ]] && {
     log.write "Timeout... reconnecting..."
     CBOT_RECONNECT=1
