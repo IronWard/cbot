@@ -27,6 +27,10 @@ IRC_EVENTSTRING=""
 #   2 : connected
 IRC_STATE=0
 
+# Associative array to store RPL_ISUPPORT (005) key-value pairs.
+# if a key doesn't have value, the value is set to the same as key.
+declare -A IRC_ISUPPORT
+
 #----------------------------------------------------------------------#
 # Description:
 #   Output IRC debug messages.
@@ -99,6 +103,8 @@ function irc.event () {
         transport.write "NICK $BOTNICK"
       }
       ;;
+    (005)
+      irc.isupport ;;
   esac
 # dispatch if a new event is generated
   irc.dispatch
@@ -108,6 +114,48 @@ function irc.event () {
   IRC_EVENTSTRING=''
   irc.dispatch
 
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   check whether the first character of passed parameter denotes a
+#   channel.
+# Usage:
+#   irc.is_chantype string
+#----------------------------------------------------------------------#
+function irc.is_chantype () {
+  local C TYPES
+  [[ $1 == '' ]] && return 1
+  C=${1:0:1}
+  TYPES=${IRC_ISUPPORT['CHANTYPES']}
+# if the server doesn't tell me valid channel types, default to '#&' as
+# defined in RFC1459
+  [[ $TYPES == '' ]] && TYPES='#&'
+  if [[ ${TYPES/"$C"} == $TYPES ]]
+  then
+    return 1
+  else
+    return 0
+  fi
+}
+
+#----------------------------------------------------------------------#
+# Description: 
+#   This function parses the numeric 005 RPL_ISUPPORT message.
+#   The supported key-value pairs are stored in associative array
+#   IRC_ISUPPORT. If a key doesn't have a value, the value is set to
+#   the same as key.
+#----------------------------------------------------------------------#
+function irc.isupport () {
+  local TARGET LIST ITEM KEY VALUE
+  read -r TARGET LIST <<<"$IRC_TARGET"
+  for ITEM in $LIST
+    do
+      KEY=${ITEM%%=*}
+      VALUE=${ITEM#*=}
+      IRC_ISUPPORT[$KEY]=$VALUE
+    done
 }
 
 
@@ -212,8 +260,7 @@ function irc.parse_privmsg () {
 #   is this an action ? (mIRC /me command)
     if [[ $TEXT =~ $RE ]]
     then
-# TODO: channel prefix should be retrieved from numeric 005
-      if [[ $C1 == '#' || $C1 == '&' ]]
+      if irc.is_chantype $C1
       then
         IRC_EVENT='_CACTION'
       else
@@ -242,8 +289,7 @@ function irc.parse_privmsg () {
   }
 
 # no special format in the text; parse normal message.
-# TODO: channel prefix should be from numeric 005
-  if [[ $C1 == '#' || $C1 == '&' ]]
+  if irc.is_chantype $C1
   then
     IRC_EVENT='_CMSG'
   else
