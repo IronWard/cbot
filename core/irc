@@ -198,18 +198,19 @@ function irc.parse () {
   then
 # if trail begins with ':' now, this command has no target
     IRC_TARGET=''
+    IRC_TRAIL="${IRC_TRAIL:1}"
   else
 # split $IRC_TRAIL into IRC_TARGET and IRC_TRAIL
 #   the first occurrence of ' :' (space followed by a comma) marks the
 #   beginning of trail.
-    IRC_TARGET=${IRC_TRAIL%% :*}
+    IRC_TARGET="${IRC_TRAIL%% :*}"
     if [[ $IRC_TARGET == $IRC_TRAIL ]]
     then
 #     there is no ' :' in trail, this command has no trail.
       IRC_TRAIL=''
     else
 #     remove target and ' :' from trail
-      IRC_TRAIL=${IRC_TRAIL#* :}
+      IRC_TRAIL="${IRC_TRAIL#* :}"
     fi
 #   remove trailing blanks from $IRC_TARGET
     RE='^(.*[^ ]) +$'
