@@ -65,6 +65,7 @@ function command.parse_pmsg () {
       [[ $TXT == '' ]] || transport.write "PART $TXT"
       ;;
     (quit)
+      CBOT_RECONNECT=0
 #     Do NOT use 'QUIT' if you are using OpenSSL as transport module.
 #     OpenSSL will disconnect if a 'QUIT' is read from stdin.
       transport.write "quit :$TXT"

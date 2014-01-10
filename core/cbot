@@ -65,19 +65,20 @@ function cbot.run () {
   do
 
     let CBOT_RETRYCOUNT++
+    [[ $CBOT_RETRYCOUNT -ge $DEFAULT_RETRYMAX ]] && {
+      log.write "Max retry reached. Exiting..."
+      break
+    }
+
     let "SEC=$CBOT_RETRYCOUNT * $DEFAULT_RETRYINC"
     log.write "Retry $CBOT_RETRYCOUNT after $SEC seconds"
     sleep $SEC
-    log.write "Connecting to $SERVER port $PORT ..."
+
+    log.write "Reconnecting to $SERVER port $PORT ..."
     transport.connect
     [[ $? -eq 0 ]] || cbot.die "connect failed"
     irc.run
     transport.disconnect
-    [[ $CBOT_RECONNECT -gt 0 && \
-       $CBOT_RETRYCOUNT -ge $DEFAULT_RETRYMAX ]] && {
-      log.write "Max retry reached. Exiting..."
-      break
-    }
 
   done
 

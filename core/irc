@@ -79,8 +79,6 @@ function irc.event () {
   IRC_EVENTSTRING=''
 # process the event
   case $IRC_COMMAND in
-    (ERROR)
-      CBOT_RECONNECT=0 ;;
     (PING)
       transport.write "PONG :$IRC_TRAIL" ;;
     (PRIVMSG)
@@ -326,10 +324,12 @@ function irc.run () {
 
   ircv3.stop
   IRC_STATE=0
-  [[ $RC -gt 128 ]] && {
-    log.write "Timeout... reconnecting..."
-    CBOT_RECONNECT=1
-  }
+  if [[ $RC -gt 128 ]]
+  then
+    log.write "Network reading return code: $RC (timeout)"
+  else
+    log.write "Network reading return code: $RC"
+  fi
 
 }
 
