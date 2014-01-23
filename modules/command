@@ -56,7 +56,9 @@ function command.parse_pmsg () {
       [[ $TXT == '' ]] || transport.write "JOIN $TXT"
       ;;
     (load)
-      [[ -f "$TXT" ]] && loader.load "$TXT"
+      [[ -f "$TXT" ]] && {
+        auth.authz '0' && loader.load "$TXT"
+      }
       ;;
     (nick)
       [[ $TXT == '' ]] || transport.write "NICK $TXT"
@@ -68,16 +70,20 @@ function command.parse_pmsg () {
       CBOT_RECONNECT=0
 #     Do NOT use 'QUIT' if you are using OpenSSL as transport module.
 #     OpenSSL will disconnect if a 'QUIT' is read from stdin.
-      transport.write "quit :$TXT"
+      auth.authz '0' && transport.write "quit :$TXT"
       ;;
     (quote)
-      [[ $TXT == '' ]] || transport.write "$TXT"
+      [[ $TXT == '' ]] || {
+        auth.authz '0' && transport.write "$TXT"
+      }
       ;;
     (say)
       [[ $FORMAT -eq 1 ]] && transport.write "PRIVMSG $TARGET :$PARM"
       ;;
     (unload)
-      [[ -f "$TXT" ]] && loader.unload "$TXT"
+      [[ -f "$TXT" ]] && {
+        auth.authz '0' && loader.unload "$TXT"
+      }
       ;;
     (version)
       [[ $TXT == '' ]] || \
