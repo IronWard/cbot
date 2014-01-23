@@ -1,0 +1,345 @@
+# cbot
+# Module name: auth
+# Module category: event handler
+# Description: authentication and authorization functions
+
+# is auth_db file ready?
+AUTH_DB=0
+# is auth_db data changed?
+AUTH_SAVE=0
+
+# associative array of id-password pairs
+declare -A AUTH_ID_PASS
+# associative array of id-flags pairs
+declare -A AUTH_ID_FLAG
+# associative array of user-id pairs
+declare -A AUTH_USER_ID
+
+# maximum users to save in AUTH_USER_ID table
+AUTH_MAX_USERS=10
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   add a new user
+# Usage:
+#   auth.adduser <ID> [<flag>]
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.adduser () {
+  local ID FLAG T
+# first arg must exist
+  [[ $1 == '' ]] && return 9
+# this command can only be used by the super user
+  auth.authz '0' || return 1
+
+  ID=$1
+  FLAG=$2
+# if no flag is provided, default is normal user flag '1'.
+  [[ $FLAG == '' ]] && FLAG='1'
+
+  if [[ ${AUTH_ID_PASS[$ID]} == '' ]]
+  then
+#   the ID is not in the ID-password table.
+#   one single space in password means i'm waiting for the first
+#   login command of the user.
+    AUTH_ID_PASS[$ID]=' '
+    AUTH_ID_FLAG[$ID]=$FLAG
+    AUTH_SAVE=1
+    T='new id added.'
+    log.write "auth: added user $ID with flag $FLAG."
+  else
+    T='user exists.'
+  fi
+
+  transport.write "PRIVMSG $IRC_NICK :$T"
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   check whether the given user has access to the flag
+# Usage:
+#   auth.authz [<flag>] [<sender>]
+#   <flag> defaults to normal user flag '1';
+#   <sender> defaults to $IRC_SENDER.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.authz () {
+  local FLAG1 FLAG2 SENDER ID
+
+  FLAG1=$1
+# if the 1st argument is omitted, it defaults to normal user flag.
+  [[ $1 == '' ]] && FLAG1='1'
+  SENDER=$2
+# if the 2nd argument is omitted, it defaults to $IRC_SENDER
+  [[ $2 == '' ]] && SENDER=$IRC_SENDER
+
+  ID=${AUTH_USER_ID[$SENDER]}
+# if user not logged in, return failure
+  [[ $ID == '' ]] && return 2
+
+  FLAG2=${AUTH_ID_FLAG[$ID]}
+# this ID has been deleted, return failure
+  [[ $FLAG2 == '' ]] && return 3
+
+# if neither '0' (super user) nor request flag is in the ID's flags,
+# ahorization fails.
+  [[ ${FLAG2/'0'} == $FLAG2 && ${FLAG2/$FLAG1} == $FLAG2 ]] && return 1
+
+  log.write "auth: $SENDER is authorized for flag $FLAG1."
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   delete a user
+# Usage:
+#   auth.deluser <ID>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.deluser () {
+  local ID T
+  [[ $1 == '' ]] && return 9
+# this command can only be used by super user.
+  auth.authz '0' || return 1
+  ID=$1
+
+  if [[ ${AUTH_ID_PASS[$ID]} == '' ]]
+  then
+    T='user not exists.'
+  else
+    unset -v AUTH_ID_PASS[$ID]
+    unset -v AUTH_ID_FLAG[$ID]
+    AUTH_SAVE=1
+    T='user deleted.'
+    log.write "auth: user $ID deleted."
+  fi
+
+  transport.write "PRIVMSG $IRC_NICK :$T"
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   add root user to the auth_db
+# Usage:
+#   auth.init_db <id> <pass>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.init_db () {
+  local ID PASS
+  [[ $1 == '' || $2 == '' ]] && return 1
+  ID=$1
+  PASS=$2
+  AUTH_ID_PASS["$ID"]=$(mkpasswd "$PASS")
+# flag '0' is the super user
+  AUTH_ID_FLAG["$ID"]='0'
+  AUTH_DB=1
+  AUTH_SAVE=1
+  log.write "auth: $ID added as super user."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   load auth_db into associative arrays
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.load_db () {
+  local -a LINES
+  local I N ID FLAG PASS
+  mapfile -t LINES <"$DATADIR/auth_db"
+  N=${#LINES[*]}
+  for (( I=0 ; $I < $N ; I++ ))
+  do
+    read -r ID FLAG PASS <<<"${LINES[$I]}"
+    [[ $ID == '' || $FLAG == '' ]] || {
+      AUTH_ID_FLAG[$ID]=$FLAG
+#     a single space of password means i'm waiting for the first login
+#     to provide a password.
+      [[ $PASS == '' ]] && PASS=' '
+      AUTH_ID_PASS[$ID]=$PASS
+    }
+  done
+  log.write "auth: loaded $N users from auth_db."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   log in the user
+# Usage:
+#   auth.login <id> <pass>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.login () {
+  local ID PASS1 PASS2 SALT I N T LOG
+
+# either ID or PASS is empty
+  [[ $1 == '' || $2 == '' ]] && return 1
+
+  ID=$1
+  PASS1=$2
+
+# if this is the first login command, add this user to super user
+  [[ $AUTH_DB -eq 0 ]] && {
+    auth.init_db $1 $2
+    transport.write "PRIVMSG $IRC_NICK :You are the super user."
+  }
+
+# get password hash from my auth_db
+  PASS2=${AUTH_ID_PASS[$ID]}
+# no password for the id
+  [[ $PASS2 == '' ]] && return 1
+
+  [[ $PASS2 == ' ' ]] && {
+    PASS2=$(mkpasswd "$PASS1")
+    AUTH_ID_PASS[$ID]=$PASS2
+    AUTH_SAVE=1
+    log.write "auth: password set for id $ID."
+    transport.write "PRIVMSG $IRC_NICK :Password set."
+  }
+
+# get salt from hash. refer to man crypt.
+  SALT=${PASS2:0:2}
+# compute hash value of password
+  PASS1=$(mkpasswd $PASS1 $SALT)
+# compare computed hash with hash stored in ID-password table
+  [[ $PASS1 == $PASS2 ]] || return 1
+
+# user provided correct password.
+# check whether user has already logged in.
+  N=${#AUTH_USER_ID[*]}
+  if [[ ${AUTH_USER_ID[$IRC_SENDER]} == '' ]]
+  then
+    if [[ $N -lt $AUTH_MAX_USERS ]]
+    then
+      AUTH_USER_ID[$IRC_SENDER]=$ID
+      T="login successful."
+      LOG="auth: $IRC_NICK logged in as id $ID."
+    else
+      T="users full."
+      LOG="auth: $IRC_NICK not logged in; user table full."
+    fi
+  else
+    if [[ ${AUTH_USER_ID[$IRC_SENDER]} == $ID ]]
+    then
+      T="already logged in."
+      LOG="auth: $IRC_NICK re-logged in."
+    else
+      AUTH_USER_ID[$IRC_SENDER]=$ID
+      T="login successful."
+      LOG="auth: $IRC_NICK logged in as another id $ID."
+    fi
+  fi
+
+  log.write "$LOG"
+  transport.write "PRIVMSG $IRC_NICK :$T"
+
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   log out the user.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.logout () {
+  [[ ${AUTH_USER_ID[$IRC_SENDER]} == '' ]] && return 0
+  unset -v AUTH_USER_ID[$IRC_SENDER]
+  log.write "auth: $IRC_NICK logged out."
+  transport.write "PRIVMSG $IRC_NICK :you've been forgotten."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   log out all users except the user issuing this command.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.logouteveryone () {
+  local USER
+  auth.authz '0' || return 1
+  for USER in ${!AUTH_USER_ID[@]}
+  do
+    [[ $USER == $IRC_SENDER ]] || {
+      unset -v AUTH_USER_ID[$USER]
+    }
+  done
+  log.write "auth: all other users logged out."
+  transport.write "PRIVMSG $IRC_NICK :all others logged out."
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   parse private message.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.parse_pmsg () {
+  local RE CMD TXT
+  [[ $IRC_TARGET == $BOTNICK ]] || return 0
+  RE='^ *\.([^ ]+) *(.*)$'
+  [[ $IRC_EVENTSTRING =~ $RE ]] || return 0
+  CMD=${BASH_REMATCH[1]}
+  TXT=${BASH_REMATCH[2]}
+
+  case $CMD in
+    (login)
+      auth.login $TXT
+      ;;
+    (logout)
+      auth.logout
+      ;;
+    (logouteveryone|logouteverybody)
+      auth.logouteveryone
+      ;;
+    (adduser)
+      auth.adduser $TXT
+      ;;
+    (deluser)
+      auth.deluser $TXT
+      ;;
+  esac
+
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   save the auth_db file.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function auth.save_db () {
+  local ID FLAG PASS OP
+  [[ $AUTH_SAVE -eq 0 ]] && return 0
+  [[ -d "$DATADIR" ]] || mkdir "$DATADIR"
+  [[ -w "$DATADIR/auth_db" ]] && rm -f "$DATADIR/auth_db"
+  OP=0
+  for ID in ${!AUTH_ID_FLAG[@]}
+  do
+    FLAG=${AUTH_ID_FLAG[$ID]}
+    PASS=${AUTH_ID_PASS[$ID]}
+    echo "$ID $FLAG $PASS" >>"$DATADIR/auth_db"
+    let OP++
+  done
+  if [[ $OP -gt 0 ]]
+  then
+    log.write "auth: $OP ids saved to auth_db."
+  else
+    log.write "auth: auth_db deleted."
+  fi
+  
+}
+
+
+function auth.install () {
+# DATADIR is set in cbot.sh
+  [[ -w "$DATADIR/auth_db" ]] && {
+    AUTH_DB=1
+    auth.load_db
+  }
+  LOADER_INSTALLSTRING="_PMSG auth.parse_pmsg"
+}
+
+function auth.uninstall () {
+  auth.save_db
+}
+
+
+

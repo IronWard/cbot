@@ -12,6 +12,7 @@ PLUGINDIR="$BOTDIR/plugins"
 TRANDIR="$BOTDIR/transport"
 # path to the configuration file
 CONFIG="$BOTDIR/cbot.cfg"
+DATADIR="$BOTDIR/data"
 # return code
 RC=0
 
