@@ -65,12 +65,12 @@ function cbot.run () {
   do
 
     let CBOT_RETRYCOUNT++
-    [[ $CBOT_RETRYCOUNT -ge $DEFAULT_RETRYMAX ]] && {
+    [[ $CBOT_RETRYCOUNT -gt $DEFAULT_RETRYMAX ]] && {
       log.write "Max retry reached. Exiting..."
       break
     }
 
-    let "SEC=$CBOT_RETRYCOUNT * $DEFAULT_RETRYINC"
+    let "SEC = 2 ** $CBOT_RETRYCOUNT * $DEFAULT_RETRYINC"
     log.write "Retry $CBOT_RETRYCOUNT after $SEC seconds"
     sleep $SEC
 
