@@ -5,7 +5,7 @@
 # Description     : default variables
 
 DEFAULT_BOTNAME="cbot"
-DEFAULT_BOTVERSION="0.05"
+DEFAULT_BOTVERSION="0.10"
 DEFAULT_BOTDESCRIPTION="A Bash Script IRC Bot"
 
 # files with below suffixes to be ignored
