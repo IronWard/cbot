@@ -1,0 +1,71 @@
+# cbot
+# Module name: chanlog
+# Module category: event handler
+# Description: log channel messages
+#              Configuration file variable: CHANLOG
+
+declare -a CHANLOG_CHANNELS
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   log the channel message.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function chanlog.parse_cmsg () {
+  local CHAN
+  for CHAN in ${CHANLOG_CHANNELS[*]}
+  do
+    [[ $CHAN == $IRC_TARGET ]] && {
+      log.writefile $CHAN.log $(date '+%T') $IRC_SENDER : $IRC_TRAIL
+    }
+  done
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Module initialization.
+#     - Parse $CHANLOG
+#     - Open log files. Log file name is channel name suffixed with
+#       '.log'.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function chanlog.initialize () {
+  local I N
+  [[ $CHANLOG ]] || return 1
+  CHANLOG_CHANNELS=( ${CHANLOG//','/' '} )
+  log.write "chanlog: channels to log:" ${CHANLOG_CHANNELS[*]}
+  N=${#CHANLOG_CHANNELS[*]}
+  for (( I=0 ; $I < $N ; I++ ))
+  do
+    log.openfile ${CHANLOG_CHANNELS[$I]}.log
+  done
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Close log files.
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function chanlog.close () {
+  local I N
+  [[ $CHANLOG ]] || return 1
+  CHANLOG_CHANNELS=( ${CHANLOG//','/' '} )
+  N=${#CHANLOG_CHANNELS[*]}
+  for (( I=0 ; $I < $N ; I++ ))
+  do
+    log.closefile ${CHANLOG_CHANNELS[$I]}.log
+  done
+}
+
+
+function chanlog.install () {
+  chanlog.initialize
+  LOADER_INSTALLSTRING="_CMSG chanlog.parse_cmsg _CACTION chanlog.parse_cmsg"
+}
+
+function chanlog.uninstall () {
+  chanlog.close
+  unset -f chanlog.initialize chanlog.close
+  unset CHANLOG_CHANNELS
+}
+

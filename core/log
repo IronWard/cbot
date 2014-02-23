@@ -2,15 +2,21 @@
 # Module name     : log
 # Module category : core
 # Depends         : cbot
-# Description     : write logs to file
+# Description     : write logs to files
+#                   The master log is named CCYYMMDD.log, used by core
+#                   modules.
 
-LOG_LEVEL=0
+
 LOG_FD=-1
 LOG_DATE=''
 
+# associative array of file names and their descriptors
+# LOG_FILES[<filename>]=<file descriptor>
+declare -A LOG_FILES
+
 #----------------------------------------------------------------------#
 # Description:
-#   close log file
+#   close the master log
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function log.close () {
   exec {LOG_FD}>&-
@@ -21,7 +27,24 @@ function log.close () {
 
 #----------------------------------------------------------------------#
 # Description:
-#   open log file
+#   Close a log file.
+# Usage:
+#   log.closefile <filename>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function log.closefile () {
+  local FILE FD
+  [[ $1 ]] || return 1
+  FD=${LOG_FILES["$1"]}
+  [[ $FD ]] || return 2
+  unset LOG_FILES["$1"]
+  exec {FD}>&-
+  return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   open the master log
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function log.open () {
   local FILE
@@ -43,7 +66,26 @@ function log.open () {
 
 #----------------------------------------------------------------------#
 # Description:
-#   write logs to file
+#   Open a log file. Log files are saved in logs/ folder.
+# Usage:
+#   log.openfile <filename>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function log.openfile () {
+  local FILE FD
+  [[ $1 ]] || return 1
+  FILE="$BOTDIR/logs/$1"
+  touch "$FILE" >/dev/null 2>&1
+  [[ $? -eq 0 ]] || return 2
+  exec {FD}>>"$FILE"
+  [[ $? -eq 0 ]] || return 3
+  LOG_FILES[$1]=$FD
+  return 0
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   write the master log
 # Usage:
 #   log.write <text>
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
@@ -62,6 +104,24 @@ function log.write () {
 # timestamp the text before logging
   echo $(date '+{%T}')" $*" >&$LOG_FD
   return $?
+}
+
+
+#----------------------------------------------------------------------#
+# Description:
+#   Write a log file.
+# Usage:
+#   log.writefile <filename> <text>
+#---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
+function log.writefile () {
+  local FILE FD TEXT
+  FILE=$1
+  shift
+  TEXT="$*"
+  [[ $FILE && $TEXT ]] || return 1
+  [[ ${LOG_FILES[$FILE]} ]] || log.openfile "$FILE"
+  FD=${LOG_FILES[$FILE]}
+  echo "$*" >&$FD
 }
 
 
