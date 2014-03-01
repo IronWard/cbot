@@ -72,6 +72,7 @@ function command.parse_pmsg () {
       auth.authz '0' && {
         CBOT_RECONNECT=0
         transport.write "quit :$TXT"
+        log.write "command: QUIT received from $IRC_SENDER"
       }
       ;;
     (quote)

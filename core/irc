@@ -91,6 +91,7 @@ function irc.event () {
 #     '001' welcome
       CBOT_RETRYCOUNT=0
       IRC_STATE=2
+      log.write "Connected."
       ;;
     (432|433)
 #     '432' erroneous nick; '433' nick in use
@@ -103,6 +104,16 @@ function irc.event () {
       ;;
     (005)
       irc.isupport ;;
+    (JOIN)
+#     this is to handle JOIN message format. Some IRC servers put channel
+#     name in the trail of JOIN message, others don't.
+#     e.g.    :nick!user@host JOIN :#chan
+#             :nick!user@host JOIN #chan
+      [[ $IRC_TARGET ]] || {
+        IRC_TARGET=$IRC_TRAIL
+        IRC_TRAIL=''
+      }
+      ;;
   esac
 # dispatch if a new event is generated
   irc.dispatch

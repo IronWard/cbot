@@ -12,11 +12,12 @@ declare -a CHANLOG_CHANNELS
 #   log the channel message.
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function chanlog.parse_cmsg () {
-  local CHAN
+  local CHAN TEXT
   for CHAN in ${CHANLOG_CHANNELS[*]}
   do
-    [[ $CHAN == $IRC_TARGET ]] && {
-      log.writefile $CHAN.log $(date '+%T') $IRC_SENDER : $IRC_TRAIL
+    [[ "$CHAN" == "$IRC_TARGET" ]] && {
+      TEXT="$(date '+%T') $TRANSPORT_READ"
+      log.writefile "$CHAN.log" "$TEXT"
     }
   done
 }
@@ -59,8 +60,11 @@ function chanlog.close () {
 
 
 function chanlog.install () {
+  local S
   chanlog.initialize
-  LOADER_INSTALLSTRING="_CMSG chanlog.parse_cmsg _CACTION chanlog.parse_cmsg"
+  S="PRIVMSG chanlog.parse_cmsg NOTICE chanlog.parse_cmsg"
+  S="$S JOIN chanlog.parse_cmsg PART chanlog.parse_cmsg"
+  LOADER_INSTALLSTRING=$S
 }
 
 function chanlog.uninstall () {
