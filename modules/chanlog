@@ -62,6 +62,7 @@ function chanlog.close () {
 function chanlog.install () {
   local S
   chanlog.initialize
+# TODO MODE, KICK commands are to be added later due to complexity
   S="PRIVMSG chanlog.parse_cmsg NOTICE chanlog.parse_cmsg"
   S="$S JOIN chanlog.parse_cmsg PART chanlog.parse_cmsg"
   LOADER_INSTALLSTRING=$S

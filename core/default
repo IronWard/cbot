@@ -11,7 +11,7 @@ DEFAULT_BOTDESCRIPTION="A Bash Script IRC Bot"
 # files with below suffixes to be ignored
 DEFAULT_IGNORESUFFIX='~ .bk .bak README'
 
-# retry count multiplying this value is the number of
+# retry count to the power of 2 multiplying this value is the number of
 # seconds to wait before next retry
 DEFAULT_RETRYINC=10
 

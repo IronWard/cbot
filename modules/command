@@ -53,7 +53,9 @@ function command.parse_pmsg () {
       }
       ;;
     (join)
-      [[ $TXT == '' ]] || transport.write "JOIN $TXT"
+      [[ $TXT == '' ]] || {
+        auth.authz '1' && transport.write "JOIN $TXT"
+      }
       ;;
     (load)
       [[ -f "$TXT" ]] && {
@@ -61,10 +63,14 @@ function command.parse_pmsg () {
       }
       ;;
     (nick)
-      [[ $TXT == '' ]] || transport.write "NICK $TXT"
+      [[ $TXT == '' ]] || {
+        auth.authz '1' && transport.write "NICK $TXT"
+      }
       ;;
     (part)
-      [[ $TXT == '' ]] || transport.write "PART $TXT"
+      [[ $TXT == '' ]] || { 
+        auth.authz '1' && transport.write "PART $TXT"
+      }
       ;;
     (quit)
 #     Do NOT use 'QUIT' if you are using OpenSSL as transport module.

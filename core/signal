@@ -10,7 +10,7 @@
 #   Commands to run on SIGCHLD
 #---+----1----+----2----+----3----+----4----+----5----+----6----+----7-#
 function signal.handle_child () {
-  cbot.debug 0 "SIGCHLD received."
+  cbot.debug 1 "SIGCHLD received."
 }
 
 

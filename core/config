@@ -1,12 +1,13 @@
 # cbot
 # Module name     : config
 # Module category : core
-# Depends         : cbot
+# Depends         : cbot, log
 # Description     : cbot configuration commands
 
 # load the configuration file
 # $CONFIG is set in cbot.sh
 cbot.debug 1 "loading config file $CONFIG ..."
+log.write "loading config file $CONFIG ..."
 source $CONFIG
 
 # SERVER must exist in config file
@@ -49,3 +50,5 @@ else
   TLS_CERT="$BOTDIR/$TLS_CERT"
   TLS_KEY="$BOTDIR/$TLS_KEY"
 fi
+
+log.write "config file loaded."

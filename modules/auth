@@ -46,7 +46,7 @@ function auth.adduser () {
     AUTH_ID_FLAG[$ID]=$FLAG
     AUTH_SAVE=1
     T='new id added.'
-    log.write "auth: added user $ID with flag $FLAG."
+    log.write "auth: added id $ID with flag $FLAG by $IRC_SENDER."
   else
     T='user exists.'
   fi
@@ -112,7 +112,7 @@ function auth.deluser () {
     unset -v AUTH_ID_FLAG[$ID]
     AUTH_SAVE=1
     T='user deleted.'
-    log.write "auth: user $ID deleted."
+    log.write "auth: user $ID deleted by $IRC_SENDER."
   fi
 
   transport.write "PRIVMSG $IRC_NICK :$T"
@@ -136,7 +136,7 @@ function auth.init_db () {
   AUTH_ID_FLAG["$ID"]='0'
   AUTH_DB=1
   AUTH_SAVE=1
-  log.write "auth: $ID added as super user."
+  log.write "auth: $ID added as super user by $IRC_SENDER."
 }
 
 
@@ -194,40 +194,49 @@ function auth.login () {
     PASS2=$(mkpasswd "$PASS1")
     AUTH_ID_PASS[$ID]=$PASS2
     AUTH_SAVE=1
-    log.write "auth: password set for id $ID."
+    log.write "auth: password set for id $ID by $IRC_SENDER."
     transport.write "PRIVMSG $IRC_NICK :Password set."
   }
 
 # get salt from hash. refer to man crypt.
   SALT=${PASS2:0:2}
 # compute hash value of password
-  PASS1=$(mkpasswd $PASS1 $SALT)
+  PASS1=$(mkpasswd "$PASS1" "$SALT")
 # compare computed hash with hash stored in ID-password table
-  [[ $PASS1 == $PASS2 ]] || return 1
+  [[ $PASS1 == $PASS2 ]] || {
+    log.write "auth: $IRC_SENDER failed to login as id $ID."
+    return 1
+  }
 
 # user provided correct password.
 # check whether user has already logged in.
   N=${#AUTH_USER_ID[*]}
   if [[ ${AUTH_USER_ID[$IRC_SENDER]} == '' ]]
   then
+#   user has not	 logged in. check whether user table is full.
     if [[ $N -lt $AUTH_MAX_USERS ]]
     then
+#     OK log in the user
       AUTH_USER_ID[$IRC_SENDER]=$ID
       T="login successful."
-      LOG="auth: $IRC_NICK logged in as id $ID."
+      LOG="auth: $IRC_SENDER logged in as id $ID."
     else
+#     user table is full. up to the super user to log out everyone.
       T="users full."
-      LOG="auth: $IRC_NICK not logged in; user table full."
+      LOG="auth: $IRC_SENDER not logged in; user table full."
     fi
   else
+#   the user has logged in
     if [[ ${AUTH_USER_ID[$IRC_SENDER]} == $ID ]]
     then
+#     the user has logged in as the same id
       T="already logged in."
-      LOG="auth: $IRC_NICK re-logged in."
+      LOG="auth: $IRC_SENDER re-logged in."
     else
+#     the user has logged in with another id.
       AUTH_USER_ID[$IRC_SENDER]=$ID
       T="login successful."
-      LOG="auth: $IRC_NICK logged in as another id $ID."
+      LOG="auth: $IRC_SENDER logged in as another id $ID."
     fi
   fi
 
@@ -245,7 +254,7 @@ function auth.login () {
 function auth.logout () {
   [[ ${AUTH_USER_ID[$IRC_SENDER]} == '' ]] && return 0
   unset -v AUTH_USER_ID[$IRC_SENDER]
-  log.write "auth: $IRC_NICK logged out."
+  log.write "auth: $IRC_SENDER logged out."
   transport.write "PRIVMSG $IRC_NICK :you've been forgotten."
 }
 
@@ -263,7 +272,7 @@ function auth.logouteveryone () {
       unset -v AUTH_USER_ID[$USER]
     }
   done
-  log.write "auth: all other users logged out."
+  log.write "auth: all other users logged out by $IRC_SENDER."
   transport.write "PRIVMSG $IRC_NICK :all others logged out."
 }
 
