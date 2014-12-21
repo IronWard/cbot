@@ -43,8 +43,7 @@ function openssl.connect () {
   exec {OPENSSL_FD_OUT}>$OPENSSL_IN
   exec {OPENSSL_FD_IN}<$OPENSSL_OUT
 
-# wait some time for openssl to connect
-  sleep 3
+# check whether openssl is running
   kill -0 $OPENSSL_PID &>/dev/null
   return $?
 }

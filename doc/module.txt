@@ -7,7 +7,7 @@
 
 Table of contents
 
-1. Types of module
+1. Types of modules
 2. Event handler module
   2.1 Static and dynamic modules
   2.2 Function interfaces
@@ -17,25 +17,27 @@ Table of contents
 5. Naming conventions
 
 
-1. Types of module
+1. Types of modules
 
-   There are four types of module: (1) core; (2) event handler; (3)
+   There are four types of modules: (1) core; (2) event handler; (3)
    transport; (4) plugin. Core modules are essential components of the
    bot. Event handler modules provide handler functions that will be
-   executed when a specified IRC event happens. Transport module
-   provides network I/O functions to support the abstract module
-   core/transport. Plugin module is external script executed by cbot.
+   executed when specified IRC events happen. Transport modules provide
+   network I/O functions to support the abstract module core/transport.
+   Plugin modules are external scripts executed by cbot.
 
-2. Event handler module
+
+2. Event handler modules
 
 2.1 Static and dynamic modules
 
-   Event handler module is loaded in two fasions: statically and
+   Event handler modules are loaded in two fasions: statically and
    dynamically. Static module must be put in the modules/ directory and
    is loaded in a global context. Dynamic module can be put anywhere
    and is loaded by the loader.load function in core/loader. Because
-   dynamic module is sourced in in a function context, all variables
-   created via the 'declare' command will become local variables.
+   dynamic modules are sourced in in a function context, all variables
+   created via the 'declare' command will become local variables unless
+   '-g' option is specified.
 
    It is suggested that:
 
@@ -44,13 +46,9 @@ Table of contents
    (2) create global indexed array:
        <modulename>_<array-name>=()
 
-   Associative array in a dynamic module will not work because dynamic
-   module is loaded in function context where 'declare' is a synonym of
-   'local' command.
-
 2.2 Function interfaces
 
-   Refer to doc/testmodule for example.
+   Refer to doc/testmodule for an example.
 
 2.2.1 <module>.install
 
@@ -59,6 +57,8 @@ Table of contents
    format:
    LOADER_INSTALLSTRING="event1 func1 event2 func2 ..."
    When IRC event 'event1' happens, 'func1' will be executed.
+
+   For details on IRC events, refer to irc.event function.
 
 2.2.2 <module>.uninstall
 
@@ -86,26 +86,29 @@ Table of contents
    (4) unset <module>.install and <module>.uninstall;
    (5) remove your module from $LOADER_MODULELIST.
 
+
 3. Transport module
 
    A transport module should implement four functions:
        <module>.connect <module>.disconnect
        <module>.read    <module>.write
-   The four functions are called by the transport core module to do
-   network I/O. <module>.read should return the read contents in the
+   The four functions are called by the core/transport module to do
+   network I/O. <module>.read should assign the read contents to the
    TRANSPORT_READ global variable. The name of transport module must be
    defined in cbot.cfg configuration file. Transport modules must reside
    in transport/ directory.
 
+
 4. Plugin
 
-   Plugin is executed by cbot as an external command. It can reside
+   Plugins are executed by cbot as external commands. They can reside
    anywhere. The plugin/ directory is a good place to place plugin
    modules. How to execute a plugin is up to the developer.
+
 
 5. Naming conventions
 
    Variables, function names should begin with the module name.
    Variables are in uppercase and function names are in lowercase.
-   E.g. YOURMODULE_VAR1, yourmodule.function1
+   E.g. YOURMODULE_VAR1, yourmodule.function1.
 

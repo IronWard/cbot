@@ -1,6 +1,8 @@
 
 
-                cBot - A Bash Script IRC Bot 
+
+                Cbot - A Bash Script IRC Bot
+
 
 
 Table of Contents
@@ -14,26 +16,31 @@ Table of Contents
 
 1. Introduction
 
-   cbot is an IRC bot written in bash script. The purpose of creating
+   Cbot is an IRC bot written in bash script. The purpose of creating
    this bot is to learn bash scripting.
+
 
 2. Features
 
-   o modularized design
-   o support SSL/TLS connection and client certificate (CertFP)
-   o support SASL authentication
-   o support conversion of character encoding if client and server are
-     of different character sets
-   o write your own modules to handle IRC events 
-   o write your own transport modules to do network I/O 
+   o Modularized design
+   o Support SSL/TLS connection and client certificate (CertFP)
+   o Support SASL authentication
+   o Conversion of character encoding if client and server are of
+     different character sets
+   o Write your own modules to handle IRC events 
+   o Write your own transport modules to do network I/O 
+
 
 3. Usage
 
-   Edit ./cbot.cfg then run ./cbot.sh
+   Edit ./cbot.cfg then run ./cbot.sh. Descriptions of configuration
+   options are provided in cbot.cfg.
+
 
 4. Development
 
-   Refer to doc/module.txt
+   Refer to doc/module.txt.
+
 
 5. Contact
 

@@ -36,8 +36,6 @@ function netcat.connect () {
   exec {NETCAT_FD_OUT}>$NETCAT_IN
   exec {NETCAT_FD_IN}<$NETCAT_OUT
 
-# wait some time for netcat to connect
-  sleep 3
 # check whether netcat is running
   kill -0 $NETCAT_PID &>/dev/null
   return $?

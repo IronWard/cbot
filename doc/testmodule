@@ -8,7 +8,7 @@
 TESTMODULE_VAR1=
 # declare global arrays that will be used in this module
 TESTMODULE_ARRAY1=()
-# associative array will not work in a dynamic module!!!
+# associative array that will be used in this module
 declare -A TESTMODULE_ASSOC
 
 

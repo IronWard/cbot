@@ -43,8 +43,7 @@ function gnutls.connect () {
   exec {GNUTLS_FD_OUT}>$GNUTLS_IN
   exec {GNUTLS_FD_IN}<$GNUTLS_OUT
 
-# wait some time for gnutls to connect
-  sleep 3
+# check whether gnutls-cli is running
   kill -0 $GNUTLS_PID &>/dev/null
   return $?
 }
