@@ -222,7 +222,8 @@ function irc.parse () {
       IRC_TRAIL="${IRC_TRAIL#* :}"
     fi
 #   remove trailing blanks from $IRC_TARGET
-    eval IRC_TARGET=$IRC_TARGET
+    RE='^(.*[^ ]) +$'
+    [[ $IRC_TARGET =~ $RE ]] && IRC_TARGET=${BASH_REMATCH[1]}
   fi
 
   irc.debug
