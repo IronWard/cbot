@@ -213,7 +213,7 @@ function auth.login () {
   N=${#AUTH_USER_ID[*]}
   if [[ ${AUTH_USER_ID[$IRC_SENDER]} == '' ]]
   then
-#   user has not	 logged in. check whether user table is full.
+#   user has not logged in. check whether user table is full.
     if [[ $N -lt $AUTH_MAX_USERS ]]
     then
 #     OK log in the user

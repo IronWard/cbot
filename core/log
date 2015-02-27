@@ -6,8 +6,9 @@
 #                   The master log is named CCYYMMDD.log, used by core
 #                   modules.
 
-
+# descriptor of the master log file
 LOG_FD=-1
+# Date when the last log line is written
 LOG_DATE=''
 
 # associative array of file names and their descriptors
@@ -78,7 +79,7 @@ function log.openfile () {
   [[ $? -eq 0 ]] || return 2
   exec {FD}>>"$FILE"
   [[ $? -eq 0 ]] || return 3
-  LOG_FILES[$1]=$FD
+  LOG_FILES["$1"]=$FD
   return 0
 }
 

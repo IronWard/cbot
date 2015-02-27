@@ -3,7 +3,9 @@
 # Module category : core
 # Description     : cbot core functions. loads in all other modules.
 
+# Reconnect to server on disconnection if set to 1
 CBOT_RECONNECT=1
+# Counter of consecutive retries of connecting
 CBOT_RETRYCOUNT=0
 
 #----------------------------------------------------------------------#
@@ -63,13 +65,13 @@ function cbot.run () {
 
   while [[ $CBOT_RECONNECT -gt 0 ]]
   do
-
+#   reconnect to server
     let CBOT_RETRYCOUNT++
     [[ $CBOT_RETRYCOUNT -gt $DEFAULT_RETRYMAX ]] && {
       log.write "Max retry reached. Exiting..."
       break
     }
-
+#   This is the formula to compute the wait time before next retry
     let "SEC = 2 ** $CBOT_RETRYCOUNT * $DEFAULT_RETRYINC"
     log.write "Retry $CBOT_RETRYCOUNT after $SEC seconds"
     sleep $SEC

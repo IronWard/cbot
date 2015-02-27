@@ -8,7 +8,8 @@ DEFAULT_BOTNAME="cbot"
 DEFAULT_BOTVERSION="0.10"
 DEFAULT_BOTDESCRIPTION="A Bash Script IRC Bot"
 
-# files with below suffixes to be ignored
+# When loading modules in the $MODDIR,
+# files with below suffixes will be ignored.
 DEFAULT_IGNORESUFFIX='~ .bk .bak README'
 
 # retry count to the power of 2 multiplying this value is the number of
